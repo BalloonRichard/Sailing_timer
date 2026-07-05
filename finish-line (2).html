@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Finish Line — sailing race timer</title>
+<!-- iOS: run full-screen when added to Home Screen -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Finish Line">
+<meta name="theme-color" content="#0A1C2E">
+<style>
+  :root{
+    --navy:#0A1C2E; --navy2:#122B44; --line:#24405E; --foam:#F2F6F9;
+    --yellow:#FFC845; --orange:#FF6B35; --red:#E23D3D; --dim:#8FA6BC; --faint:#3D5A78;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  body{margin:0; background:var(--navy); color:var(--foam);
+    font-family:system-ui,-apple-system,sans-serif; overscroll-behavior:none;}
+  .wrap{max-width:480px; margin:0 auto; padding:12px 14px 110px;
+    padding-top:calc(12px + env(safe-area-inset-top));}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-variant-numeric:tabular-nums;}
+  button{font-family:inherit; cursor:pointer; touch-action:manipulation;}
+
+  .hdr{display:flex; justify-content:space-between; align-items:baseline;
+    border-bottom:2px solid var(--navy2); padding-bottom:8px;}
+  .eyebrow{font-size:11px; letter-spacing:.22em; color:var(--yellow); font-weight:700;}
+  .title{font-size:22px; font-weight:800;}
+  .date{font-size:12px; color:var(--dim); text-align:right;}
+
+  .clock{text-align:center; padding:14px 0 4px;}
+  .clock .big{font-size:52px; font-weight:700; letter-spacing:.03em; line-height:1;}
+  .clock .sub{font-size:14px; color:var(--dim); margin-top:6px; min-height:18px;}
+  .clock .sub b{color:var(--yellow);}
+
+  .row{display:flex; gap:8px; justify-content:center; margin-bottom:14px;}
+  .chip{background:var(--navy2); color:var(--foam); border:1px solid var(--line);
+    border-radius:8px; padding:8px 14px; font-size:13px; font-weight:600;}
+  .chip.ghost{background:transparent; color:var(--dim); font-weight:400;}
+  .chip.on{color:var(--yellow);}
+
+  .markbtn{width:100%; padding:26px 0; border-radius:16px; border:none;
+    background:var(--yellow); color:var(--navy); font-size:30px; font-weight:900;
+    letter-spacing:.14em; box-shadow:0 6px 0 #B98F1F;}
+  .markbtn:active{transform:translateY(3px); box-shadow:0 3px 0 #B98F1F;}
+  .hint{text-align:center; font-size:12px; color:var(--dim); margin-top:8px;}
+  .hint b{color:var(--orange);}
+
+  .panel{background:var(--navy2); border:1px solid var(--line); border-radius:14px;
+    padding:14px; margin-top:14px;}
+  .panel .top{display:flex; justify-content:space-between; align-items:center;
+    font-size:12px; letter-spacing:.15em; color:var(--dim); font-weight:700;}
+  .panel .top .t{color:var(--foam);}
+  .listen{color:var(--red); font-weight:700; font-size:12px;}
+  .speakbtn{color:var(--yellow); background:none; border:none; font-weight:700; font-size:12px;}
+  .draft{font-size:40px; font-weight:700; text-align:center; padding:10px 0;
+    min-height:58px; letter-spacing:.08em;}
+  .draft .ph{color:var(--faint);}
+  .heard{text-align:center; font-size:12px; color:var(--dim); margin-bottom:6px;}
+  .pad{display:grid; grid-template-columns:repeat(3,1fr); gap:8px;}
+  .pad button{padding:14px 0; border-radius:10px; font-size:22px; font-weight:700;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    background:var(--navy); color:var(--foam); border:1px solid var(--line);}
+  .pad button.ok{background:var(--yellow); color:var(--navy); border:none;}
+  .later{width:100%; margin-top:10px; background:none; border:none;
+    color:var(--dim); font-size:13px; padding:6px;}
+
+  .listhdr{display:flex; justify-content:space-between; align-items:baseline;
+    margin:20px 0 6px;}
+  .listhdr .lbl{font-size:12px; letter-spacing:.2em; color:var(--dim); font-weight:700;}
+  .listhdr .clr{background:none; border:none; color:var(--red); font-size:12px;}
+  .empty{text-align:center; color:var(--faint); font-size:14px; padding:24px 0;}
+
+  .entry{display:flex; align-items:center; gap:12px; background:var(--navy2);
+    border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:8px;}
+  .entry.pending{background:#3A2A14; border-color:var(--orange);}
+  .entry .pos{font-size:13px; color:var(--dim); width:26px;}
+  .entry .sail{flex:1; text-align:left; background:none; border:none; color:var(--foam);
+    font-size:22px; font-weight:700;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}
+  .entry.pending .sail{color:var(--orange); font-size:16px;}
+  .entry .times{text-align:right;}
+  .entry .times .t{font-size:16px; font-weight:700;}
+  .entry .times .e{font-size:12px; color:var(--yellow);}
+  .entry .del{background:none; border:none; color:var(--faint); font-size:18px; padding:0 2px;}
+
+  .bar{position:fixed; left:0; right:0; bottom:0; display:flex; gap:8px;
+    max-width:480px; margin:0 auto;
+    padding:10px 14px calc(10px + env(safe-area-inset-bottom));
+    background:rgba(10,28,46,.96); border-top:1px solid var(--line);}
+  .bar .exp{flex:2; background:var(--foam); color:var(--navy); border:none;
+    border-radius:10px; padding:13px 0; font-size:15px; font-weight:800;}
+  .bar .cpy{flex:1; background:transparent; color:var(--foam);
+    border:1px solid var(--line); border-radius:10px; padding:13px 0; font-size:15px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hdr">
+    <div>
+      <div class="eyebrow">RACE COMMITTEE</div>
+      <div class="title">Finish Line</div>
+    </div>
+    <div class="date" id="hdrDate"></div>
+  </div>
+
+  <div class="clock">
+    <div class="big mono" id="clockBig">00:00:00</div>
+    <div class="sub mono" id="clockSub">no race start set</div>
+  </div>
+
+  <div class="row">
+    <button class="chip" id="startBtn">Start race now</button>
+    <button class="chip" id="voiceBtn" style="display:none">🎙 voice on</button>
+  </div>
+
+  <button class="markbtn" id="markBtn">MARK FINISH</button>
+  <div class="hint" id="hint">tap the moment the boat crosses — time is locked to the second</div>
+
+  <div class="panel" id="panel" style="display:none">
+    <div class="top">
+      <div>FINISH LOCKED <span class="t mono" id="lockedTime"></span></div>
+      <span class="listen" id="listenTag" style="display:none">● listening…</span>
+      <button class="speakbtn" id="speakBtn" style="display:none">🎙 speak</button>
+    </div>
+    <div class="draft mono" id="draft"><span class="ph">sail no.</span></div>
+    <div class="heard" id="heard" style="display:none"></div>
+    <div class="pad" id="pad"></div>
+    <button class="later" id="laterBtn">assign later</button>
+  </div>
+
+  <div class="listhdr">
+    <div class="lbl" id="countLbl">FINISHES (0)</div>
+    <button class="clr" id="clearBtn" style="display:none">clear all</button>
+  </div>
+  <div id="list"><div class="empty">No finishes yet — first boat over the line starts the list.</div></div>
+</div>
+
+<div class="bar" id="bar" style="display:none">
+  <button class="exp" id="exportBtn">Export CSV</button>
+  <button class="cpy" id="copyBtn">Copy</button>
+</div>
+
+<script>
+(function(){
+"use strict";
+var pad=function(n){return String(n).padStart(2,"0");};
+var clockTime=function(ms){var d=new Date(ms);return pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds());};
+var elapsed=function(ms,start){if(!start||ms<start)return"";var s=Math.floor((ms-start)/1000);
+  var h=Math.floor(s/3600);s-=h*3600;var m=Math.floor(s/60);s-=m*60;return h+":"+pad(m)+":"+pad(s);};
+
+var WORDS={zero:"0",oh:"0",o:"0",nought:"0",one:"1",won:"1",two:"2",to:"2",too:"2",
+  three:"3",four:"4","for":"4",fore:"4",five:"5",six:"6",seven:"7",eight:"8",ate:"8",nine:"9"};
+function parseSail(t){
+  var out="", ws=t.toLowerCase().replace(/[^a-z0-9\s]/g," ").split(/\s+/);
+  for(var i=0;i<ws.length;i++){var w=ws[i];if(!w)continue;
+    if(/^[0-9]+$/.test(w))out+=w;
+    else if(WORDS[w])out+=WORDS[w];
+    else if(/^[a-z]{1,3}$/.test(w)&&out==="")out+=w.toUpperCase();}
+  return out;
+}
+
+// ---- state ----
+var entries=[], raceStart=null, activeId=null, draft="", listening=false, autoListen=true;
+try{
+  var saved=JSON.parse(localStorage.getItem("finishline")||"{}");
+  if(Array.isArray(saved.entries))entries=saved.entries;
+  if(saved.raceStart)raceStart=saved.raceStart;
+  if(saved.autoListen===false)autoListen=false;
+}catch(e){}
+function save(){try{localStorage.setItem("finishline",
+  JSON.stringify({entries:entries,raceStart:raceStart,autoListen:autoListen}));}catch(e){}}
+
+// ---- speech ----
+var SR=window.SpeechRecognition||window.webkitSpeechRecognition, rec=null;
+var voiceOk=!!SR;
+function startListening(){
+  if(!SR)return;
+  try{rec&&rec.abort();}catch(e){}
+  rec=new SR();rec.lang="en-GB";rec.interimResults=false;rec.maxAlternatives=1;
+  rec.onresult=function(ev){
+    var text=ev.results[0][0].transcript||"";
+    el("heard").textContent="heard: \u201C"+text+"\u201D";el("heard").style.display="block";
+    var s=parseSail(text);if(s){draft=s;renderPanel();}
+  };
+  rec.onerror=function(){listening=false;renderPanel();};
+  rec.onend=function(){listening=false;renderPanel();};
+  try{rec.start();listening=true;el("heard").style.display="none";}catch(e){listening=false;}
+  renderPanel();
+}
+function stopListening(){try{rec&&rec.stop();}catch(e){}listening=false;}
+
+// ---- dom ----
+function el(id){return document.getElementById(id);}
+function fmtDate(d){return d.toLocaleDateString(undefined,{weekday:"short",day:"numeric",month:"short"});}
+
+el("hdrDate").textContent=fmtDate(new Date());
+
+setInterval(function(){
+  var now=Date.now();
+  el("clockBig").textContent=clockTime(now);
+  el("clockSub").innerHTML=raceStart
+    ? 'ELAPSED <b>'+elapsed(now,raceStart)+'</b> · start '+clockTime(raceStart)
+    : 'no race start set';
+},250);
+
+el("startBtn").addEventListener("click",function(){
+  if(!raceStart){raceStart=Date.now();}
+  else if(confirm("Clear race start time?")){raceStart=null;}
+  save();renderStart();
+});
+function renderStart(){
+  var b=el("startBtn");
+  if(raceStart){b.textContent="Clear start";b.classList.add("ghost");}
+  else{b.textContent="Start race now";b.classList.remove("ghost");}
+}
+
+if(voiceOk){
+  el("voiceBtn").style.display="";
+  el("voiceBtn").addEventListener("click",function(){
+    autoListen=!autoListen;save();renderVoice();
+  });
+}
+function renderVoice(){
+  var b=el("voiceBtn");
+  b.textContent="🎙 voice "+(autoListen?"on":"off");
+  b.classList.toggle("on",autoListen);
+}
+
+el("markBtn").addEventListener("click",function(){
+  var t=Date.now();
+  var id=t+"-"+Math.random().toString(36).slice(2,7);
+  entries.push({id:id,t:t,sail:null});
+  activeId=id;draft="";
+  save();renderAll();
+  if(autoListen&&voiceOk)startListening();
+  if(navigator.vibrate)navigator.vibrate(30);
+});
+
+// keypad
+(function(){
+  var keys=["1","2","3","4","5","6","7","8","9","⌫","0","OK"];
+  keys.forEach(function(k){
+    var b=document.createElement("button");
+    b.textContent=k;if(k==="OK")b.className="ok";
+    b.addEventListener("click",function(){
+      if(k==="OK"){commit();}
+      else if(k==="⌫"){draft=draft.slice(0,-1);renderPanel();}
+      else if(draft.length<8){draft+=k;renderPanel();}
+    });
+    el("pad").appendChild(b);
+  });
+})();
+
+function commit(){
+  if(!activeId)return;
+  var s=draft.trim();
+  entries=entries.map(function(e){return e.id===activeId&&s?Object.assign({},e,{sail:s}):e;});
+  activeId=null;draft="";stopListening();save();renderAll();
+}
+el("laterBtn").addEventListener("click",function(){
+  activeId=null;draft="";stopListening();renderAll();
+});
+el("speakBtn").addEventListener("click",startListening);
+
+el("clearBtn").addEventListener("click",function(){
+  if(!confirm("Clear all recorded finishes?"))return;
+  entries=[];activeId=null;draft="";save();renderAll();
+});
+
+// ---- CSV ----
+function buildCsv(){
+  var rows=[["Position","Sail number","Finish time","Elapsed","Date"]];
+  entries.forEach(function(e,i){
+    var d=new Date(e.t);
+    rows.push([String(i+1),e.sail||"",clockTime(e.t),
+      raceStart?elapsed(e.t,raceStart):"",
+      d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())]);
+  });
+  return rows.map(function(r){return r.map(function(c){
+    return '"'+String(c).replace(/"/g,'""')+'"';}).join(",");}).join("\r\n");
+}
+function csvName(){var d=new Date();
+  return "finish-times-"+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+".csv";}
+
+el("exportBtn").addEventListener("click",async function(){
+  var csv=buildCsv();
+  var file=new File([csv],csvName(),{type:"text/csv"});
+  // iOS: share sheet is the native way — save to Files, AirDrop, Mail, etc.
+  if(navigator.canShare&&navigator.canShare({files:[file]})){
+    try{await navigator.share({files:[file],title:"Finish times"});return;}
+    catch(e){if(e.name==="AbortError")return;/* fall through */}
+  }
+  var blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement("a");
+  a.href=url;a.download=csvName();
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  setTimeout(function(){URL.revokeObjectURL(url);},2000);
+});
+el("copyBtn").addEventListener("click",function(){
+  navigator.clipboard.writeText(buildCsv()).then(
+    function(){alert("CSV copied to clipboard");},
+    function(){alert("Copy failed — use Export instead");});
+});
+
+// ---- render ----
+function renderPanel(){
+  var e=entries.find(function(x){return x.id===activeId;});
+  el("panel").style.display=e?"":"none";
+  if(!e)return;
+  el("lockedTime").textContent=clockTime(e.t);
+  el("draft").innerHTML=draft?draft:'<span class="ph">sail no.</span>';
+  el("listenTag").style.display=listening?"":"none";
+  el("speakBtn").style.display=(voiceOk&&!listening)?"":"none";
+}
+function renderList(){
+  var n=entries.length;
+  el("countLbl").textContent="FINISHES ("+n+")";
+  el("clearBtn").style.display=n?"":"none";
+  el("bar").style.display=n?"flex":"none";
+  var pending=entries.filter(function(e){return !e.sail&&e.id!==activeId;}).length;
+  el("hint").innerHTML="tap the moment the boat crosses — time is locked to the second"
+    +(pending?" · <b>"+pending+" awaiting number</b>":"");
+  var list=el("list");list.innerHTML="";
+  if(!n){list.innerHTML='<div class="empty">No finishes yet — first boat over the line starts the list.</div>';return;}
+  entries.map(function(e,i){return Object.assign({pos:i+1},e);}).reverse().forEach(function(e){
+    var row=document.createElement("div");
+    row.className="entry"+(e.sail?"":" pending");
+    var posD=document.createElement("div");posD.className="pos mono";posD.textContent=e.pos;
+    var sailB=document.createElement("button");sailB.className="sail";
+    sailB.textContent=e.sail||"tap to add no.";
+    sailB.addEventListener("click",function(){
+      activeId=e.id;draft=e.sail||"";renderAll();
+      if(!e.sail&&autoListen&&voiceOk)startListening();
+    });
+    var times=document.createElement("div");times.className="times";
+    times.innerHTML='<div class="t mono">'+clockTime(e.t)+'</div>'
+      +(raceStart?'<div class="e mono">'+elapsed(e.t,raceStart)+'</div>':'');
+    var del=document.createElement("button");del.className="del";del.textContent="✕";
+    del.addEventListener("click",function(){
+      entries=entries.filter(function(x){return x.id!==e.id;});
+      if(activeId===e.id){activeId=null;draft="";stopListening();}
+      save();renderAll();
+    });
+    row.appendChild(posD);row.appendChild(sailB);row.appendChild(times);row.appendChild(del);
+    list.appendChild(row);
+  });
+}
+function renderAll(){renderStart();renderVoice();renderPanel();renderList();}
+renderAll();
+})();
+</script>
+</body>
+</html>
